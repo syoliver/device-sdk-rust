@@ -7,3 +7,11 @@ authors = ["Sylvain Oliver"]
 
 [dependencies]
 log = { version = "0.4" }
+openapi = { path = "external/openapi", features = ["server"] }
+axum = { version = "0.7" }
+axum-extra = { version = "0.9", features = ["cookie", "multipart"] }
+http = "1"
+tokio = { version = "1", default-features = false, features = [
+    "signal",
+    "rt-multi-thread",
+] }

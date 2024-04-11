@@ -1,0 +1,10 @@
+templateDir: /local/tools/generator
+files:
+  models.mustache:
+    folder: src
+    templateType: SupportingFiles
+    destinationFilename: models.rs
+  lib.mustache:
+    folder: src
+    templateType: SupportingFiles
+    destinationFilename: lib.rs
