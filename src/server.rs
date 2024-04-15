@@ -1,59 +1,55 @@
+#![allow(unused)]
+
 use openapi;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use crate::service::Service;
 use axum_extra::extract::{CookieJar};
 use http::Method;
 use axum;
 use axum::extract::Host;
 use tokio;
+use async_trait::async_trait;
+use std::ops::Drop;
+use log;
+use tokio::sync::Notify;
 
+#[derive(Clone)]
 pub struct RestServer {
-    service: Arc<Service>
-}
-
-
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("failed to install signal handler")
-            .recv()
-            .await;
-    };
-
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
-    }
+    service: Weak<Service>
 }
 
 impl RestServer {
-    pub fn new(service: Arc<Service>) -> Self {
-        Self {
-            service: service
-        }
+    pub fn new(service: Arc<Service>) -> Arc<Self> {
+        Arc::new(Self {
+            service: Arc::downgrade(&service)
+        })
     }
 
-    pub async fn run(self: Arc<Self>, address: &str) {
-        // Run the server with graceful shutdown
-        let listener = tokio::net::TcpListener::bind(address).await.unwrap();
-        let router = openapi::server::new(self);
-        axum::serve(listener, router)
-            .with_graceful_shutdown(shutdown_signal())
-            .await
-            .unwrap();
+    pub fn run(self: Arc<Self>, address: String, notify_stop: Arc<Notify>) {
+
+        let spawn_notify_stop = notify_stop.clone();
+        tokio::spawn(async move {
+            // Run the server with graceful shutdown
+            let listener = tokio::net::TcpListener::bind(address).await.unwrap();
+            let router = openapi::server::new(self);
+
+            axum::serve(listener, router)
+                .with_graceful_shutdown(async move { spawn_notify_stop.notified().await; })
+                .await
+                .unwrap();
+        });
     }
 }
 
+unsafe impl Send for RestServer {}
+unsafe impl Sync for RestServer {}
+
+impl Drop for RestServer {
+    fn drop(&mut self) {
+        // TODO: kill the running task
+    }
+}
+#[async_trait]
 impl openapi::Api for RestServer {
     /// Returns the current configuration of the service..
     ///
@@ -64,7 +60,7 @@ impl openapi::Api for RestServer {
         host: Host,
         cookies: CookieJar,
         ) -> Result<openapi::ConfigGetResponse, String> {
-        Err("not implemented")
+        Err("not implemented".to_string())
     }
 
 
@@ -78,7 +74,7 @@ impl openapi::Api for RestServer {
             path_params: openapi::models::DeviceNameNameCommandGetPathParams,
             query_params: openapi::models::DeviceNameNameCommandGetQueryParams,
         ) -> Result<openapi::DeviceNameNameCommandGetResponse, String> {
-            Err("not implemented")
+            Err("not implemented".to_string())
         }
 
 
@@ -92,7 +88,7 @@ impl openapi::Api for RestServer {
             path_params: openapi::models::DeviceNameNameCommandPutPathParams,
                 body: openapi::models::SettingRequest,
         ) -> Result<openapi::DeviceNameNameCommandPutResponse, String> {
-            Err("not implemented")
+            Err("not implemented".to_string())
         }
 
 
@@ -103,7 +99,7 @@ impl openapi::Api for RestServer {
         host: Host,
         cookies: CookieJar,
         ) -> Result<openapi::DiscoveryPostResponse, String> {
-            Err("not implemented")
+            Err("not implemented".to_string())
         }
 
 
@@ -116,7 +112,7 @@ impl openapi::Api for RestServer {
         host: Host,
         cookies: CookieJar,
         ) -> Result<openapi::PingGetResponse, String> {
-            Err("not implemented")
+            Err("not implemented".to_string())
         }
 
 
@@ -131,7 +127,7 @@ impl openapi::Api for RestServer {
         header_params: openapi::models::SecretPostHeaderParams,
         body: openapi::models::SecretRequest,
         ) -> Result<openapi::SecretPostResponse, String> {
-            Err("not implemented")
+            Err("not implemented".to_string())
         }
 
 
@@ -144,7 +140,7 @@ impl openapi::Api for RestServer {
         host: Host,
         cookies: CookieJar,
         ) -> Result<openapi::VersionGetResponse, String> {
-            Err("not implemented")
+            Err("not implemented".to_string())
         }
     
 }

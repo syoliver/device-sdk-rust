@@ -1,14 +1,13 @@
-use std::error::Error;
+#![allow(dead_code)]
 
+use std::error::Error;
 use crate::protocol::Driver;
-use crate::server::RestServer;
 use std::sync::Arc;
 
 pub struct Service {
     service_key: String,
     service_version: String,
     driver: Box<dyn Driver>,
-    api: Box<RestServer>
 }
 
 impl Service {
@@ -19,6 +18,7 @@ impl Service {
             driver: driver,
         }))
     }
+
 
     pub fn run(&self) -> Result<(), Box<dyn Error>> {
         Ok(())
