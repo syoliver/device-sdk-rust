@@ -29,6 +29,7 @@ impl RestServer {
 
         let spawn_notify_stop = notify_stop.clone();
         tokio::spawn(async move {
+            log::info!("Run http server on {}", address);
             // Run the server with graceful shutdown
             let listener = tokio::net::TcpListener::bind(address).await.unwrap();
             let router = openapi::server::new(self);
@@ -60,6 +61,7 @@ impl openapi::Api for RestServer {
         host: Host,
         cookies: CookieJar,
         ) -> Result<openapi::ConfigGetResponse, String> {
+        log::error!("config_get not implemented");
         Err("not implemented".to_string())
     }
 
@@ -74,6 +76,7 @@ impl openapi::Api for RestServer {
             path_params: openapi::models::DeviceNameNameCommandGetPathParams,
             query_params: openapi::models::DeviceNameNameCommandGetQueryParams,
         ) -> Result<openapi::DeviceNameNameCommandGetResponse, String> {
+            log::error!("device_name_name_command_get not implemented");
             Err("not implemented".to_string())
         }
 
@@ -88,6 +91,7 @@ impl openapi::Api for RestServer {
             path_params: openapi::models::DeviceNameNameCommandPutPathParams,
                 body: openapi::models::SettingRequest,
         ) -> Result<openapi::DeviceNameNameCommandPutResponse, String> {
+            log::error!("device_name_name_command_put not implemented");
             Err("not implemented".to_string())
         }
 
@@ -99,6 +103,7 @@ impl openapi::Api for RestServer {
         host: Host,
         cookies: CookieJar,
         ) -> Result<openapi::DiscoveryPostResponse, String> {
+            log::error!("discovery_post not implemented");
             Err("not implemented".to_string())
         }
 
@@ -112,6 +117,7 @@ impl openapi::Api for RestServer {
         host: Host,
         cookies: CookieJar,
         ) -> Result<openapi::PingGetResponse, String> {
+            log::error!("ping_get not implemented");
             Err("not implemented".to_string())
         }
 
@@ -127,6 +133,7 @@ impl openapi::Api for RestServer {
         header_params: openapi::models::SecretPostHeaderParams,
         body: openapi::models::SecretRequest,
         ) -> Result<openapi::SecretPostResponse, String> {
+            log::error!("secret_post not implemented");
             Err("not implemented".to_string())
         }
 
@@ -140,6 +147,7 @@ impl openapi::Api for RestServer {
         host: Host,
         cookies: CookieJar,
         ) -> Result<openapi::VersionGetResponse, String> {
+            log::error!("version_get not implemented");
             Err("not implemented".to_string())
         }
     

@@ -1,0 +1,1 @@
+docker-compose -f docker-compose-edgex-unsecure.yml -f docker-compose.yml up

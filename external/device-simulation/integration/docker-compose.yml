@@ -1,0 +1,12 @@
+services:
+  device-simulation:
+    build:
+      context: ../../..
+      target: runtime
+      args:
+        BUILD_TYPE: release
+    environment:
+        SIMULATION_LOG: debug
+    ports:
+      - 8080:8080
+
