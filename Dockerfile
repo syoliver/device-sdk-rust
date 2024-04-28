@@ -1,5 +1,5 @@
 ARG ALPINE_VERSION=3.19
-ARG RUST_VERSION=1.77
+ARG RUST_VERSION=1.77.2
 FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION} as build_env
 ARG BUILD_TYPE=debug #debug or release 
 
