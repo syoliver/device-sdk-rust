@@ -11,9 +11,10 @@ use std::sync::{Arc, Mutex};
 use std::pin::Pin;
 use std::future::Future;
 
-#[derive(Debug)]
-enum RegistryError {
-    Internal,
+#[derive(Debug, Clone)]
+pub enum RegistryError {
+    CastFailure,
+    Error(String),
 }
 
 impl Error for RegistryError {
@@ -28,12 +29,20 @@ impl Error for RegistryError {
 
 impl fmt::Display for RegistryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Internal error")
+        match self {
+            RegistryError::CastFailure => {
+                write!(f, "Cast failure")
+            },
+            RegistryError::Error(err) => {
+                write!(f, "Failure {}", err)
+            }
+        }
     }
 }
 
-type AnyFuture<'a> = Shared<BoxFuture<'a, Result<Arc<dyn Any + Send + Sync>, Box<dyn Error>>>>;
-
+pub type Provided<Module> = Result<Arc<Mutex<Module>>, RegistryError>;
+pub type AnyProvided = Result<Arc<dyn Any + Send + Sync>, RegistryError>;
+type AnyFuture<'a> = Shared<BoxFuture<'a, AnyProvided>>;
 pub struct Registry<'a> {
     modules: HashMap<TypeId, AnyFuture<'a>>,
 }
@@ -65,19 +74,33 @@ impl<'a> Registry<'a> {
         }
     }
 
-    pub fn register<T: Any + Send + Sync>(&mut self, module: BoxFuture<'a, Result<Arc<dyn Any + Send + Sync>, Box<dyn Error>>>) -> Result<(), Box<dyn Error>> {
+    pub fn register<T: Any + Send + Sync>(&mut self, module: BoxFuture<'a, AnyProvided>) -> Result<(), Box<dyn Error>> {
         self.modules.insert(TypeId::of::<T>(), module.shared());
         Ok(())
     }
 
-    pub async fn provide<T: 'static>(&self) -> Option<Result<Arc<Mutex<T>>, Box<dyn Error>>> {
+    fn provide_any<T: 'static>(&self) -> Option<AnyFuture<'a>> {
         let type_id = TypeId::of::<T>();
         if let Some(future_any_module) = self.modules.get(&type_id) {
-            let any_module = future_any_module.clone().await;
-            if let Some(module) = any_module.downcast_ref::<Arc<Mutex<T>>>() {
-                Some(Ok(module.clone()))
-            } else {
-                Some(Err(Box::new(RegistryError::Internal)))
+            Some(future_any_module.clone())
+        } else {
+            None
+        }
+    }
+
+    pub async fn provide<T: Send + 'static>(&self) -> Option<Provided<T>> {
+        if let Some(any_result_module) = self.provide_any::<T>() {
+            match any_result_module.await {
+                Ok(any_module) =>  {
+                    if let Ok(module) = any_module.downcast::<Mutex<T>>() {
+                        Some(Ok(module))
+                    } else {
+                        Some(Err(RegistryError::CastFailure))
+                    }
+                },
+                Err(err) => {
+                    Some(Err(err))
+                }
             }
         } else {
             None
@@ -85,68 +108,60 @@ impl<'a> Registry<'a> {
     }
 }
 
+unsafe impl Send for Registry<'_> {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[derive(Debug)]
-    enum ProviderError {
-        Test,
-    }
-    
-    impl Error for ProviderError {
-        fn description(&self) -> &str {
-            "Error in test provider"
-        }
-    
-        fn cause(&self) -> Option<&dyn Error> {
-            None
-        }
-    }
-    
-    impl fmt::Display for ProviderError {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, "Internal error")
-        }
-    }
-
     
     #[tokio::test]
     async fn test_registry() {
-        let mut registry = Arc::new(Registry::new());
-
-        async fn first_closure() -> Result<Arc<dyn Any + Send + Sync>, Box<dyn Error>> {
-            sleep(Duration::from_millis(1000)).await;
-            Ok(Arc::new(42))
-        }
-
-        async fn second_closure(registry: Arc<Registry<'_>>) -> Result<Arc<dyn Any + Send + Sync>, Box<dyn Error>> {
-            if let Some(Ok(value)) = registry.provide::<i32>().await {
-                Ok(Arc::new(value.lock().unwrap().to_string()))
-            } else {
-                Err(Box::new(ProviderError::Test))
+        let registry = Arc::new(Mutex::new(Registry::new()));
+        let mut future_any_value: Option<AnyFuture<'static>> = None;
+        {
+            let mut registry_lock = registry.lock().unwrap();
+            async fn first_closure() -> Result<Arc<dyn Any + Send + Sync>, RegistryError> {
+                sleep(Duration::from_millis(1000)).await;
+                Ok(Arc::new(Mutex::new(42)))
             }
-        }
 
-        let first_future = first_closure().boxed();
-        let second_future = second_closure(registry.clone()).boxed();
+            async fn second_closure(registry: Arc<Mutex<Registry<'_>>>) -> Result<Arc<dyn Any + Send + Sync>, RegistryError> {
+                let future_any_value: Shared<Pin<Box<dyn Future<Output = Result<Arc<dyn Any + Sync + Send>, RegistryError>> + Send>>> = registry.lock().unwrap().provide_any::<i32>().unwrap();
+                if let Ok(any_value) = future_any_value.await {
+                    if let Ok(value) = any_value.downcast::<Mutex<i32>>() {
+                        Ok(Arc::new(Mutex::new(value.lock().unwrap().to_string())))
+                    } else {
+                        Err(RegistryError::CastFailure)
+                    }
+                    
+                } else {
+                    Err(RegistryError::Error("Got an error".to_owned()))
+                }
+            }
 
-        if let Err(err) = registry.register::<i32>(first_future) {
-            assert!(false, "Error during i32 register");
+            let first_future = first_closure().boxed();
+            let second_future = second_closure(registry.clone()).boxed();
+
+            if let Err(err) = registry_lock.register::<i32>(first_future) {
+                assert!(false, "Error during i32 register");
+            }
+
+            if let Err(err) = registry_lock.register::<String>(second_future) {
+                assert!(false, "Error during String register");
+            }
+
+            future_any_value = registry_lock.provide_any::<String>();
         }
         
-        if let Err(err) = registry.register::<String>(second_future) {
-            assert!(false, "Error during String register");
-        }
-        
-        if let Some(provided) = registry.provide::<String>().await {
-            if let Ok(value) = provided {
-                assert_eq!(value, "42".to_string().into());
+        if let Ok(any_value) = future_any_value.unwrap().await {
+            if let Ok(value) = any_value.downcast::<Mutex<String>>() {
+                assert_eq!(*value.lock().unwrap().deref(), "42".to_string());
             } else {
-                assert!(false, "Error during String cast");
+                assert!(false, "Error during String evaluation");
             }
         } else {
-            assert!(false, "Error retrieving String value");
+            assert!(false, "Type failure in String module");
         }
     }
 }
