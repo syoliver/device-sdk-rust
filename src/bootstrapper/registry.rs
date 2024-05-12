@@ -2,12 +2,12 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::error::Error;
 use futures::{FutureExt, future::{BoxFuture, Shared}};
-use tokio::{runtime::{Handle, Runtime}, time::{sleep, Duration}};
+use tokio::{runtime::{Handle, Runtime}, time::{sleep, Duration}, sync::Mutex};
 use tokio;
 use clone_cell::cell::Cell;
 use std::ops::Deref;
 use std::fmt;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use std::pin::Pin;
 use std::future::Future;
 
@@ -120,17 +120,17 @@ mod tests {
         let registry = Arc::new(Mutex::new(Registry::new()));
         let mut future_any_value: Option<AnyFuture<'static>> = None;
         {
-            let mut registry_lock = registry.lock().unwrap();
+            let mut registry_lock = registry.lock().await;
             async fn first_closure() -> Result<Arc<dyn Any + Send + Sync>, RegistryError> {
                 sleep(Duration::from_millis(1000)).await;
                 Ok(Arc::new(Mutex::new(42)))
             }
 
             async fn second_closure(registry: Arc<Mutex<Registry<'_>>>) -> Result<Arc<dyn Any + Send + Sync>, RegistryError> {
-                let future_any_value: Shared<Pin<Box<dyn Future<Output = Result<Arc<dyn Any + Sync + Send>, RegistryError>> + Send>>> = registry.lock().unwrap().provide_any::<i32>().unwrap();
+                let future_any_value: Shared<Pin<Box<dyn Future<Output = Result<Arc<dyn Any + Sync + Send>, RegistryError>> + Send>>> = registry.lock().await.provide_any::<i32>().unwrap();
                 if let Ok(any_value) = future_any_value.await {
                     if let Ok(value) = any_value.downcast::<Mutex<i32>>() {
-                        Ok(Arc::new(Mutex::new(value.lock().unwrap().to_string())))
+                        Ok(Arc::new(Mutex::new(value.lock().await.to_string())))
                     } else {
                         Err(RegistryError::CastFailure)
                     }
@@ -156,7 +156,7 @@ mod tests {
         
         if let Ok(any_value) = future_any_value.unwrap().await {
             if let Ok(value) = any_value.downcast::<Mutex<String>>() {
-                assert_eq!(*value.lock().unwrap().deref(), "42".to_string());
+                assert_eq!(*value.lock().await.deref(), "42".to_string());
             } else {
                 assert!(false, "Error during String evaluation");
             }
