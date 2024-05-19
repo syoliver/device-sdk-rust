@@ -7,7 +7,7 @@ use tokio;
 use clone_cell::cell::Cell;
 use std::ops::Deref;
 use std::fmt;
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::pin::Pin;
 use std::future::Future;
 
