@@ -1,0 +1,29 @@
+name: PR CI
+run-name: "[PR CI] ${{ github.head_ref }} -> ${{ github.base_ref }} :rocket:"
+on: [pull_request]
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Generate Open Api
+        run: ./generate_api.sh
+      - name: Create build environment
+        uses: docker/build-push-action@v5
+        with:
+          push: false
+          target: build_env
+          tags: build_env:latest
+          load: true
+      - name: "Run cargo test in build environment"
+        uses: addnab/docker-run-action@v3
+        with:
+          image: build_env:latest
+          options: -v ${{ github.workspace }}:/src
+          run: cargo test
+
