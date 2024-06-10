@@ -19,11 +19,24 @@ jobs:
           push: false
           target: build_env
           tags: build_env:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           load: true
       - name: "Run cargo test in build environment"
         uses: addnab/docker-run-action@v3
         with:
           image: build_env:latest
           options: -v ${{ github.workspace }}:/src
-          run: cargo test
+          run: |
+            NEXTEST_PROFILE=ci cargo llvm-cov --no-report nextest
+            cargo llvm-cov report --lcov --output-path lcov.info
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: target/nextest/ci/junit.xml
+      - name: Upload coverage data to codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: lcov.info
 
