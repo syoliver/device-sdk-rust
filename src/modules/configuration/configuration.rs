@@ -200,6 +200,7 @@ fn load_configuration_from_yaml(configuration_file: &str) -> Result<Configuratio
 impl Configuration {
     pub fn load() -> Result<Self, Box<dyn Error>> {
         let configuration_file = get_configuration_location()?;
+        
         let mut config = load_configuration_from_yaml(&configuration_file)?;
         config.override_configuration_from_env()?;
         Ok(config)
@@ -269,9 +270,12 @@ mod tests {
 
     #[test]
     fn test_load() -> Result<(), Box::<dyn Error>> {
-        let config_test = Path::new(&env::var("CARGO_MANIFEST_DIR")?).join("src").join("configuration");
-        let _ = env::set_current_dir(config_test);
-
+        let this_file = file!();
+        let configuration_path = std::path::Path::new(this_file).parent().unwrap();
+        let config_test = Path::new(&env::var("CARGO_MANIFEST_DIR")?).join(configuration_path);
+        
+        let _ = env::set_current_dir(&config_test);
+        
         env::set_var("CLIENTS_CORE_METADATA_PORT", "42");
 
 
