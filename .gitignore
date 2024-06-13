@@ -2,3 +2,5 @@
 /external/openapi
 /target
 /external/openapi/target
+/.config/nextest.toml
+/lcov.info

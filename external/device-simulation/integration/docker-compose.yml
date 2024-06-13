@@ -7,6 +7,12 @@ services:
         BUILD_TYPE: release
     environment:
         SIMULATION_LOG: debug
+        EDGEX_CONFIG_DIR: /etc/local/edgex
+    volumes:
+      - type: bind
+        source: ./res
+        target: /etc/local/edgex
+        read_only: true
     ports:
-      - 8080:8080
+      - 59988:8080
 

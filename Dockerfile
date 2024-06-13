@@ -1,13 +1,16 @@
-ARG ALPINE_VERSION=3.19
-ARG RUST_VERSION=1.77
+ARG ALPINE_VERSION=3.20
+ARG RUST_VERSION=1.78.0
 FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION} as build_env
-ARG BUILD_TYPE=debug #debug or release 
 
-RUN apk add --no-cache musl-dev rust-gdb
+RUN apk add --no-cache musl-dev rust-gdb &&     \
+        cargo install cargo-llvm-cov &&         \
+        cargo install cargo-nextest &&          \
+        rustup component add llvm-tools-preview
 
 WORKDIR /src
 
 FROM build_env as build_simulation
+ARG BUILD_TYPE=debug #debug or release
 
 COPY . .
 
