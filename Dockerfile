@@ -1,5 +1,5 @@
 ARG ALPINE_VERSION=3.20
-ARG RUST_VERSION=1.78.0
+ARG RUST_VERSION=1.79.0
 FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION} as build_env
 
 RUN apk add --no-cache musl-dev rust-gdb &&     \
